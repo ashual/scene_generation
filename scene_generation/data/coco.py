@@ -1,27 +1,29 @@
-import json, os, random, math
+import json
+import math
+import os
+import pickle
+import random
 from collections import defaultdict
 
-import torch
-from torch.utils.data import Dataset
-import torchvision.transforms as T
-
-import numpy as np
-import pickle
 import PIL
-from skimage.transform import resize as imresize
+import numpy as np
 import pycocotools.mask as mask_utils
+import torch
+import torchvision.transforms as T
+from skimage.transform import resize as imresize
+from torch.utils.data import Dataset
 
 from .utils import imagenet_preprocess, Resize
 
+PREDICATES_VALUES = ['left of', 'right of', 'above', 'below', 'inside', 'surrounding']
+
 
 class CocoSceneGraphDataset(Dataset):
-    def __init__(self, image_dir, instances_json, stuff_json=None,
-                 stuff_only=True, image_size=(64, 64), mask_size=16,
-                 normalize_images=True, max_samples=None,
-                 min_object_size=0.02,
-                 min_objects_per_image=3, max_objects_per_image=8,
-                 include_other=False, instance_whitelist=None, stuff_whitelist=None, include_sentences=False,
-                 captions_json=None, no__img__=False, sample_attributes=False, val_part=False):
+    def __init__(self, image_dir, instances_json, stuff_json=None, stuff_only=True, image_size=(64, 64), mask_size=16,
+                 normalize_images=True, max_samples=None, min_object_size=0.02,
+                 min_objects_per_image=3, max_objects_per_image=8, include_other=False, instance_whitelist=None,
+                 stuff_whitelist=None, no__img__=False, sample_attributes=False, val_part=False, size_attribute_len=10,
+                 location_attribute_len=25):
         """
         A PyTorch Dataset for loading Coco and Coco-Stuff annotations and converting
         them to scene graphs on the fly.
@@ -63,171 +65,82 @@ class CocoSceneGraphDataset(Dataset):
         self.mask_size = mask_size
         self.max_samples = max_samples
         self.normalize_images = normalize_images
-        self.include_sentence = include_sentences
+        self.min_object_size = min_object_size
+        self.include_other = include_other
+        self.stuff_only = stuff_only
+        self.min_objects_per_image = min_objects_per_image
+        self.max_objects_per_image = max_objects_per_image
         self.set_image_size(image_size)
         self.no__img__ = no__img__
-
-        with open(instances_json, 'r') as f:
-            instances_data = json.load(f)
-
-        image_id_to_caption = {}
-        self.image_id_to_sentences = {}
-        if self.include_sentence:
-            with open(captions_json, 'r') as f:
-                captions_data = json.load(f)
-                for caption_data in captions_data['annotations']:
-                    if caption_data['image_id'] not in image_id_to_caption:
-                        image_id_to_caption[caption_data['image_id']] = caption_data['caption']
-                self.image_id_to_sentences = image_id_to_caption
-        stuff_data = None
-        if stuff_json is not None and stuff_json != '':
-            with open(stuff_json, 'r') as f:
-                stuff_data = json.load(f)
-
         self.image_ids = []
         self.image_id_to_filename = {}
         self.image_id_to_size = {}
-        for image_data in instances_data['images']:
-            image_id = image_data['id']
-            filename = image_data['file_name']
-            width = image_data['width']
-            height = image_data['height']
-            self.image_ids.append(image_id)
-            self.image_id_to_filename[image_id] = filename
-            self.image_id_to_size[image_id] = (width, height)
-
-        self.vocab = {
-            'object_name_to_idx': {},
-            'pred_name_to_idx': {},
-        }
-        self.size_attribute_len = 10
-        self.location_attribute_len = 16
-        self.vocab['num_attributes'] = self.size_attribute_len + self.location_attribute_len
-        object_idx_to_name = {}
-        all_instance_categories = []
-        for category_data in instances_data['categories']:
-            category_id = category_data['id']
-            category_name = category_data['name']
-            all_instance_categories.append(category_name)
-            object_idx_to_name[category_id] = category_name
-            self.vocab['object_name_to_idx'][category_name] = category_id
-        all_stuff_categories = []
-        if stuff_data:
-            for category_data in stuff_data['categories']:
-                category_name = category_data['name']
-                category_id = category_data['id']
-                all_stuff_categories.append(category_name)
-                object_idx_to_name[category_id] = category_name
-                self.vocab['object_name_to_idx'][category_name] = category_id
-
-        if instance_whitelist is None:
-            instance_whitelist = all_instance_categories
-        if stuff_whitelist is None:
-            stuff_whitelist = all_stuff_categories
-        category_whitelist = set(instance_whitelist) | set(stuff_whitelist)
-
-        # Add object data from instances
         self.image_id_to_objects = defaultdict(list)
-        for object_data in instances_data['annotations']:
-            image_id = object_data['image_id']
-            _, _, w, h = object_data['bbox']
-            W, H = self.image_id_to_size[image_id]
-            box_area = (w * h) / (W * H)
-            box_ok = box_area > min_object_size
-            object_name = object_idx_to_name[object_data['category_id']]
-            category_ok = object_name in category_whitelist
-            other_ok = object_name != 'other' or include_other
-            if box_ok and category_ok and other_ok:
-                self.image_id_to_objects[image_id].append(object_data)
 
-        # Add object data from stuff
+        self.size_attribute_len = size_attribute_len
+        self.location_attribute_len = location_attribute_len
+
+        instances_data, stuff_data = self.load_data(instances_json, stuff_json)
+        if instance_whitelist is None:
+            instance_whitelist = [cat['name'] for cat in instances_data['categories']]
         if stuff_data:
-            image_ids_with_stuff = set()
-            for object_data in stuff_data['annotations']:
-                image_id = object_data['image_id']
-                image_ids_with_stuff.add(image_id)
-                _, _, w, h = object_data['bbox']
-                W, H = self.image_id_to_size[image_id]
-                box_area = (w * h) / (W * H)
-                box_ok = box_area > min_object_size
-                object_name = object_idx_to_name[object_data['category_id']]
-                category_ok = object_name in category_whitelist
-                other_ok = object_name != 'other' or include_other
-                if box_ok and category_ok and other_ok:
-                    self.image_id_to_objects[image_id].append(object_data)
-            if stuff_only:
-                new_image_ids = []
-                for image_id in self.image_ids:
-                    if image_id in image_ids_with_stuff:
-                        new_image_ids.append(image_id)
-                self.image_ids = new_image_ids
+            stuff_data_categories = stuff_data['categories']
+            if stuff_whitelist is None:
+                stuff_whitelist = [cat['name'] for cat in stuff_data['categories']]
+        else:
+            stuff_data_categories = None
+            stuff_whitelist = []
 
-                all_image_ids = set(self.image_id_to_filename.keys())
-                image_ids_to_remove = all_image_ids - image_ids_with_stuff
-                for image_id in image_ids_to_remove:
-                    self.image_id_to_filename.pop(image_id, None)
-                    self.image_id_to_size.pop(image_id, None)
-                    self.image_id_to_objects.pop(image_id, None)
+        self.all_categories = set(instance_whitelist) | set(stuff_whitelist)
+
+        self.object_idx_to_name, self.object_name_to_idx = \
+            self.create_vocab(instances_data['categories'], stuff_data_categories, instance_whitelist, stuff_whitelist)
+
+        self.objects_map, self.total_objs = self.create_images_and_objects_dataset(instances_data, stuff_data)
 
         # COCO category labels start at 1, so use 0 for __image__
-        self.vocab['object_name_to_idx']['__image__'] = 0
+        self.object_name_to_idx['__image__'] = 0
 
         # Build object_idx_to_name
-        name_to_idx = self.vocab['object_name_to_idx']
-        assert len(name_to_idx) == len(set(name_to_idx.values()))
-        max_object_idx = max(name_to_idx.values())
+        assert len(self.object_name_to_idx) == len(set(self.object_name_to_idx.values()))
+        max_object_idx = max(self.object_name_to_idx.values())
         idx_to_name = ['NONE'] * (1 + max_object_idx)
-        for name, idx in self.vocab['object_name_to_idx'].items():
+        for name, idx in self.object_name_to_idx.items():
             idx_to_name[idx] = name
-        self.vocab['object_idx_to_name'] = idx_to_name
 
-        # Prune images that have too few or too many objects
-        new_image_ids = []
-        total_objs = 0
-        for image_id in self.image_ids:
-            num_objs = len(self.image_id_to_objects[image_id])
-            total_objs += num_objs
-            if min_objects_per_image <= num_objs <= max_objects_per_image:
-                if include_sentences:
-                    categories_per_image = [i['category_id'] for i in self.image_id_to_objects[image_id] if i]
-                    first_stuff_id = stuff_data['categories'][0]['id']
-                    num_stuff = len([i for i in categories_per_image if i >= first_stuff_id])
-                    num_things = num_objs - num_stuff
-                    if num_stuff == 2 and num_things == 2 and len(set(categories_per_image)) == 4:
-                        new_image_ids.append(image_id)
-                else:
-                    new_image_ids.append(image_id)
-        self.image_ids = new_image_ids
+        # First 1024 images in the validation are for validation, the rest are for test
         if val_part:
+            self.image_ids = self.image_ids[:1024]
+        else:
             self.image_ids = self.image_ids[1024:]
 
-        objects_map = set()
-        for image_id in self.image_ids:
-            for object in self.image_id_to_objects[image_id]:
-                object_class = object['category_id']
-                objects_map.add(object_class)
-
-        objects_map = list(objects_map)
-        object_to_idx = {v: k + 1 for k, v in enumerate(objects_map)}
+        # objects_map = set()
+        # for image_id in self.image_ids:
+        #     for object in self.image_id_to_objects[image_id]:
+        #         object_class = object['category_id']
+        #         objects_map.add(object_class)
+        #
+        object_to_idx = {v: k + 1 for k, v in enumerate(self.objects_map)}
         object_to_idx[0] = 0
         self.object_to_idx = object_to_idx
         self.idx_to_object = {v: k for k, v in object_to_idx.items()}
-        self.vocab['object_to_idx'] = object_to_idx
-        self.vocab['my_idx_to_obj'] = [self.vocab['object_idx_to_name'][i] for i in objects_map]
+
+        self.my_idx_to_obj = [self.object_idx_to_name[i] for i in self.objects_map]
         self.object_num = len(object_to_idx)
 
-        self.vocab['pred_idx_to_name'] = [
-            '__in_image__',
-            'left of',
-            'right of',
-            'above',
-            'below',
-            'inside',
-            'surrounding',
-        ]
-        self.vocab['pred_name_to_idx'] = {}
-        for idx, name in enumerate(self.vocab['pred_idx_to_name']):
-            self.vocab['pred_name_to_idx'][name] = idx
+        self.pred_idx_to_name = ['__in_image__'] + PREDICATES_VALUES
+        self.pred_name_to_idx = {name: idx for idx, name in enumerate(self.pred_idx_to_name)}
+
+        self.vocab = {
+            'object_name_to_idx': self.object_name_to_idx,
+            'object_to_idx': object_to_idx,
+            'object_idx_to_name': idx_to_name,
+            'my_idx_to_obj': self.my_idx_to_obj,
+            'num_attributes': self.size_attribute_len + self.location_attribute_len,
+            'pred_idx_to_name': self.pred_idx_to_name,
+            'pred_name_to_idx': self.pred_name_to_idx,
+            'is_panoptic': False
+        }
 
         self.sample_attributes = None
         if sample_attributes:
@@ -252,18 +165,108 @@ class CocoSceneGraphDataset(Dataset):
         self.image_size = image_size
 
     def total_objects(self):
-        total_objs = 0
-        for i, image_id in enumerate(self.image_ids):
-            if self.max_samples and i >= self.max_samples:
-                break
-            num_objs = len(self.image_id_to_objects[image_id])
-            total_objs += num_objs
-        return total_objs
+        return self.total_objs
 
     def __len__(self):
         if self.max_samples is None:
             return len(self.image_ids)
         return min(len(self.image_ids), self.max_samples)
+
+    @staticmethod
+    def load_data(instances_json, stuff_json):
+
+        with open(instances_json, 'r') as f:
+            instances_data = json.load(f)
+
+        stuff_data = None
+        if stuff_json is not None and stuff_json != '':
+            with open(stuff_json, 'r') as f:
+                stuff_data = json.load(f)
+        return instances_data, stuff_data
+
+    @staticmethod
+    def create_vocab(instances_data_categories, stuff_data_categories, instance_whitelist, stuff_whitelist):
+        object_idx_to_name = {}
+        object_name_to_idx = {}
+        for category_data in instances_data_categories:
+            category_id = category_data['id']
+            category_name = category_data['name']
+            if category_name in instance_whitelist:
+                object_idx_to_name[category_id] = category_name
+                object_name_to_idx[category_name] = category_id
+        if stuff_data_categories:
+            for category_data in stuff_data_categories:
+                category_id = category_data['id']
+                category_name = category_data['name']
+                if category_name in stuff_whitelist:
+                    object_idx_to_name[category_id] = category_name
+                    object_name_to_idx[category_name] = category_id
+        return object_idx_to_name, object_name_to_idx
+
+    def is_approved_object(self, object_data):
+        image_id = object_data['image_id']
+        _, _, w, h = object_data['bbox']
+        W, H = self.image_id_to_size[image_id]
+        box_area = (w * h) / (W * H)
+        box_ok = box_area > self.min_object_size
+        object_name = self.object_idx_to_name[object_data['category_id']]
+        category_ok = object_name in self.all_categories
+        other_ok = object_name != 'other' or self.include_other
+        return box_ok and category_ok and other_ok
+
+    def create_images_and_objects_dataset(self, instances_data, stuff_data):
+        for image_data in instances_data['images']:
+            image_id = image_data['id']
+            filename = image_data['file_name']
+            width = image_data['width']
+            height = image_data['height']
+            self.image_ids.append(image_id)
+            self.image_id_to_filename[image_id] = filename
+            self.image_id_to_size[image_id] = (width, height)
+
+        # Add object data from instances
+        for object_data in instances_data['annotations']:
+            if self.is_approved_object(object_data):
+                self.image_id_to_objects[object_data['image_id']].append(object_data)
+
+        # Add object data from stuff
+        image_ids_with_stuff = set()
+        new_image_ids = set()
+        if stuff_data:
+            for object_data in stuff_data['annotations']:
+                if self.is_approved_object(object_data):
+                    image_ids_with_stuff.add(object_data['image_id'])
+                    self.image_id_to_objects[object_data['image_id']].append(object_data)
+            # if self.stuff_only:
+            #     for image_id in self.image_ids:
+            #         if image_id in image_ids_with_stuff:
+            #             new_image_ids.add(image_id)
+        total_objs = 0
+        for image_id in self.image_ids:
+            num_objs = len(self.image_id_to_objects[image_id])
+            if (not self.stuff_only or image_id in image_ids_with_stuff) and\
+                self.min_objects_per_image <= num_objs <= self.max_objects_per_image:
+                new_image_ids.add(image_id)
+                total_objs += num_objs
+            else:
+                self.image_id_to_filename.pop(image_id, None)
+                self.image_id_to_size.pop(image_id, None)
+                self.image_id_to_objects.pop(image_id, None)
+
+        # all_image_ids = set(self.image_id_to_filename.keys())
+        # image_ids_to_remove = all_image_ids - image_ids_with_stuff
+        # for image_id in image_ids_to_remove:
+        #     self.image_id_to_filename.pop(image_id, None)
+        #     self.image_id_to_size.pop(image_id, None)
+        #     self.image_id_to_objects.pop(image_id, None)
+        self.image_ids = list(new_image_ids)
+
+        objects_map = set()
+        for image_id in self.image_ids:
+            for object in self.image_id_to_objects[image_id]:
+                object_class = object['category_id']
+                objects_map.add(object_class)
+        return list(objects_map), total_objs
 
     def __getitem__(self, index):
         """
@@ -435,9 +438,6 @@ class CocoSceneGraphDataset(Dataset):
 
         triples = torch.LongTensor(triples)
         attributes = torch.cat([size_attribute, location_attribute], dim=1)
-        if self.include_sentence:
-            sentence = self.image_id_to_sentences[image_id]
-            return image, objs, boxes, masks, triples, attributes, sentence
         return image, objs, boxes, masks, triples, attributes
 
     def get_location_and_size(self, s, p, o, location_attribute, size_attribute, location_distr):

@@ -8,7 +8,8 @@ from scipy.misc import imsave
 from torch.utils.data import DataLoader
 
 from scene_generation.data import imagenet_deprocess_batch
-from scene_generation.data.coco_panoptic import CocoPanopticSceneGraphDataset, coco_collate_fn
+from scene_generation.data.coco_panoptic import CocoPanopticSceneGraphDataset, coco_panoptic_collate_fn
+from scene_generation.data.coco import CocoSceneGraphDataset, coco_collate_fn
 from scene_generation.data.utils import split_graph_batch
 from scene_generation.vis import draw_scene_graph
 from scene_generation.metrics import jaccard
@@ -57,6 +58,28 @@ def build_coco_dset(args, checkpoint):
     dset_kwargs = {
         'image_dir': args.coco_image_dir,
         'instances_json': args.instances_json,
+        'stuff_json': args.stuff_json,
+        'image_size': args.image_size,
+        'mask_size': checkpoint_args['mask_size'],
+        'max_samples': args.num_samples,
+        'min_object_size': checkpoint_args['min_object_size'],
+        'min_objects_per_image': checkpoint_args['min_objects_per_image'],
+        'instance_whitelist': checkpoint_args['instance_whitelist'],
+        'stuff_whitelist': checkpoint_args['stuff_whitelist'],
+        'include_other': checkpoint_args.get('coco_include_other', True),
+        'val_part': False,
+        'sample_attributes': args.sample_attributes,
+        'grid_size': args.grid_size
+    }
+    dset = CocoSceneGraphDataset(**dset_kwargs)
+    return dset
+
+def build_coco_panoptic_dset(args, checkpoint):
+    checkpoint_args = checkpoint['args']
+    print('include other: ', checkpoint_args.get('coco_include_other'))
+    dset_kwargs = {
+        'image_dir': args.coco_image_dir,
+        'instances_json': args.instances_json,
         'panoptic': checkpoint_args['coco_panoptic_val'],
         'panoptic_segmentation': checkpoint_args['coco_panoptic_segmentation_val'],
         'stuff_json': args.stuff_json,
@@ -76,9 +99,13 @@ def build_coco_dset(args, checkpoint):
     return dset
 
 
-def build_loader(args, checkpoint):
-    dset = build_coco_dset(args, checkpoint)
-    collate_fn = coco_collate_fn
+def build_loader(args, checkpoint, is_panoptic):
+    if is_panoptic:
+        dset = build_coco_panoptic_dset(args, checkpoint)
+        collate_fn = coco_panoptic_collate_fn
+    else:
+        dset = build_coco_dset(args, checkpoint)
+        collate_fn = coco_collate_fn
 
     loader_kwargs = {
         'batch_size': args.batch_size,
@@ -134,7 +161,7 @@ def run_model(args, checkpoint, output_dir, loader=None):
         vocab = checkpoint['model_kwargs']['vocab']
         model = build_model(args, checkpoint)
         if loader is None:
-            loader = build_loader(args, checkpoint)
+            loader = build_loader(args, checkpoint, vocab['is_panoptic'])
 
         img_dir = makedir(output_dir, 'images')
         graph_dir = makedir(output_dir, 'graphs', args.save_graphs)

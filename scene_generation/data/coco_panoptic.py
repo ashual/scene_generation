@@ -22,8 +22,8 @@ class CocoPanopticSceneGraphDataset(Dataset):
                  normalize_images=True, max_samples=None,
                  min_object_size=0.02,
                  min_objects_per_image=3, max_objects_per_image=8,
-                 include_other=False, instance_whitelist=None, stuff_whitelist=None, include_sentences=False,
-                 captions_json=None, no__img__=False, sample_attributes=False, val_part=False, grid_size=25):
+                 include_other=False, instance_whitelist=None, stuff_whitelist=None,
+                 no__img__=False, sample_attributes=False, val_part=False, grid_size=25):
         """
         A PyTorch Dataset for loading Coco and Coco-Stuff annotations and converting
         them to scene graphs on the fly.
@@ -65,7 +65,6 @@ class CocoPanopticSceneGraphDataset(Dataset):
         self.mask_size = mask_size
         self.max_samples = max_samples
         self.normalize_images = normalize_images
-        self.include_sentence = include_sentences
         self.set_image_size(image_size)
         self.no__img__ = no__img__
 
@@ -166,15 +165,7 @@ class CocoPanopticSceneGraphDataset(Dataset):
                     all_segments.append(segment)
             num_objs = len(all_segments)
             if min_objects_per_image <= num_objs <= max_objects_per_image:
-                if include_sentences:
-                    categories_per_image = [i['category_id'] for i in all_segments if i]
-                    first_stuff_id = stuff_data['categories'][0]['id']
-                    num_stuff = len([i for i in categories_per_image if i >= first_stuff_id])
-                    num_things = num_objs - num_stuff
-                    if num_stuff == 2 and num_things == 2 and len(set(categories_per_image)) == 4:
-                        new_image_ids.append(image_id)
-                else:
-                    new_image_ids.append(image_id)
+                new_image_ids.append(image_id)
                 total_objs += num_objs
                 self.image_id_to_objects[image_id] = all_segments
                 [objects_map.add(i['category_id']) for i in all_segments if i]
@@ -227,15 +218,7 @@ class CocoPanopticSceneGraphDataset(Dataset):
         #     num_objs = len(self.image_id_to_objects[image_id])
         #     total_objs += num_objs
         #     if min_objects_per_image <= num_objs <= max_objects_per_image:
-        #         if include_sentences:
-        #             categories_per_image = [i['category_id'] for i in self.image_id_to_objects[image_id] if i]
-        #             first_stuff_id = stuff_data['categories'][0]['id']
-        #             num_stuff = len([i for i in categories_per_image if i >= first_stuff_id])
-        #             num_things = num_objs - num_stuff
-        #             if num_stuff == 2 and num_things == 2 and len(set(categories_per_image)) == 4:
-        #                 new_image_ids.append(image_id)
-        #         else:
-        #             new_image_ids.append(image_id)
+    #             new_image_ids.append(image_id)
         self.image_ids = new_image_ids
         if val_part:
             self.image_ids = self.image_ids[1024:]

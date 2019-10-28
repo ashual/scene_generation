@@ -8,8 +8,7 @@ from scene_generation.layers import GlobalAvgPool, build_cnn, get_norm_layer
 
 
 class AcDiscriminator(nn.Module):
-    def __init__(self, vocab, arch, normalization='none', activation='relu',
-                 padding='same', pooling='avg'):
+    def __init__(self, vocab, arch, normalization='none', activation='relu', padding='same', pooling='avg'):
         super(AcDiscriminator, self).__init__()
         self.vocab = vocab
 
@@ -64,7 +63,6 @@ def weights_init(m):
         m.bias.data.fill_(0)
 
 
-
 def define_D(input_nc, ndf, n_layers_D, norm='instance', use_sigmoid=False, num_D=1):
     norm_layer = get_norm_layer(norm_type=norm)
     netD = MultiscaleDiscriminator(input_nc, ndf, n_layers_D, norm_layer, use_sigmoid, num_D)
@@ -78,23 +76,23 @@ def define_D(input_nc, ndf, n_layers_D, norm='instance', use_sigmoid=False, num_
 def define_mask_D(input_nc, ndf, n_layers_D, norm='instance', use_sigmoid=False, num_D=1,
                   num_objects=None):
     norm_layer = get_norm_layer(norm_type=norm)
-    netD = MultiscaleDiscriminator_2(input_nc, ndf, n_layers_D, norm_layer, use_sigmoid, num_D,
-                                     num_objects)
+    netD = MultiscaleMaskDiscriminator(input_nc, ndf, n_layers_D, norm_layer, use_sigmoid, num_D,
+                                       num_objects)
     assert (torch.cuda.is_available())
     netD.cuda()
     netD.apply(weights_init)
     return netD
 
 
-class MultiscaleDiscriminator_2(nn.Module):
+class MultiscaleMaskDiscriminator(nn.Module):
     def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d,
                  use_sigmoid=False, num_D=3, num_objects=None):
-        super(MultiscaleDiscriminator_2, self).__init__()
+        super(MultiscaleMaskDiscriminator, self).__init__()
         self.num_D = num_D
         self.n_layers = n_layers
 
         for i in range(num_D):
-            netD = NLayerDiscriminator_2(input_nc, ndf, n_layers, norm_layer, use_sigmoid, num_objects)
+            netD = NLayerMaskDiscriminator(input_nc, ndf, n_layers, norm_layer, use_sigmoid, num_objects)
             for j in range(n_layers + 2):
                 setattr(self, 'scale' + str(i) + '_layer' + str(j), getattr(netD, 'model' + str(j)))
 
@@ -127,10 +125,10 @@ class MultiscaleDiscriminator_2(nn.Module):
 
 
 # Defines the PatchGAN discriminator with the specified arguments.
-class NLayerDiscriminator_2(nn.Module):
+class NLayerMaskDiscriminator(nn.Module):
     def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_sigmoid=False,
                  num_objects=None):
-        super(NLayerDiscriminator_2, self).__init__()
+        super(NLayerMaskDiscriminator, self).__init__()
         self.n_layers = n_layers
 
         kw = 3
@@ -245,6 +243,3 @@ class NLayerDiscriminator(nn.Module):
             model = getattr(self, 'model' + str(n))
             res.append(model(res[-1]))
         return res[1:]
-
-
-

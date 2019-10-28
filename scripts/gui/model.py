@@ -15,8 +15,6 @@ from scene_generation.model import Model
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--checkpoint', required=True)
-parser.add_argument('--first_checkpoint', default=None)  # default='new_new_output/Mar08_17-10-10_pc-wolf-g04/checkpoint_with_model.pt')
-parser.add_argument('--scene_graphs_json', default='scene_graphs/figure_5_coco.json')
 parser.add_argument('--output_dir', default='outputs')
 parser.add_argument('--draw_scene_graphs', type=int, default=0)
 parser.add_argument('--device', default='gpu', choices=['cpu', 'gpu'])
@@ -48,31 +46,12 @@ def get_model():
     checkpoint = torch.load(args.checkpoint, map_location=map_location)
     dirname = os.path.dirname(args.checkpoint)
     features_path = os.path.join(dirname, 'features_clustered_010.npy')
-    # print(features_path)
-    # features = None
     if os.path.isfile(features_path):
         features = np.load(features_path).item()
     else:
         features = None
     model = Model(**checkpoint['model_kwargs'])
     model_state = checkpoint['model_state']
-    if args.first_checkpoint is not None:
-        all_new_keys = []
-        first_checkpoint = torch.load(args.first_checkpoint)
-        print('Loading first model from ', args.first_checkpoint)
-        for (k, v) in first_checkpoint['model_best_inception_state'].items():
-            # CHANGE: for (k, v) in first_checkpoint['model_best_state'].items():
-            if k == 'repr_net.0.weight':
-                break
-            # print(k)
-            model_state[k] = v
-            all_new_keys.append(k)
-        remove_old_keys = []
-        for (k, v) in model_state.items():
-            if 'mask' in k and k not in all_new_keys:
-                remove_old_keys.append(k)
-        for k in remove_old_keys:
-            del model_state[k]
     model.load_state_dict(model_state)
     model.features = features
     model.colors = torch.randint(0, 256, [134, 3]).float()
@@ -119,8 +98,6 @@ def one_hot_to_rgb(one_hot, colors):
 
 
 def json_to_scene_graph(json_text):
-    # size = 10
-    # location = 16
     scene = json.loads(json_text)
     if len(scene) == 0:
         return []
@@ -141,13 +118,10 @@ def json_to_scene_graph(json_text):
         sy1 = obj_s['height'] + sy0
         mean_x_s = 0.5 * (sx0 + sx1)
         mean_y_s = 0.5 * (sy0 + sy1)
-        #
-        # size_index = round((10 - 1) * obj_s['width'] * obj_s['height'])
-        # location_index = int(round(mean_x_s * ((16 / 4) - 1)) + (16 / 4) * round(mean_y_s * ((16 / 4) - 1)))
+
         size.append(obj_s['size'])
         location.append(obj_s['location'])
 
-        # feature = 5 if obj_s['feature'] == -1 else obj_s['feature']
         features.append(obj_s['feature'])
         if i == len(objects) - 1:
             continue

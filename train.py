@@ -183,9 +183,7 @@ def main(args):
     trainer.writer.add_scalar('checkpoint/{}'.format('train_inception_std'), t_inception_std, index)
     print(t_avg_iou, t_inception_mean, t_inception_std)
 
-    while True:
-        if t >= args.num_iterations:
-            break
+    while t < args.num_iterations:
         epoch += 1
         print('Starting epoch %d' % epoch)
 

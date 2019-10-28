@@ -101,7 +101,7 @@ parser.add_argument('--crop_size', default=32, type=int)
 
 # Output options
 current_time = datetime.now().strftime('%b%d_%H-%M-%S')
-log_dir = os.path.join(os.getcwd(), 'new_output', current_time + '_' + socket.gethostname())
+log_dir = os.path.join(os.getcwd(), 'output', current_time + '_' + socket.gethostname())
 parser.add_argument('--print_every', default=100, type=int)
 parser.add_argument('--checkpoint_every', default=10000, type=int)
 parser.add_argument('--output_dir', default=log_dir)

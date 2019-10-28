@@ -3,15 +3,15 @@ import torch
 import numpy as np
 import torchvision.transforms as T
 
-IMAGENET_MEAN = [0.5, 0.5, 0.5]
-IMAGENET_STD = [0.5, 0.5, 0.5]
+MEAN = [0.5, 0.5, 0.5]
+STD = [0.5, 0.5, 0.5]
 
-INV_IMAGENET_MEAN = [-m for m in IMAGENET_MEAN]
-INV_IMAGENET_STD = [1.0 / s for s in IMAGENET_STD]
+INV_MEAN = [-m for m in MEAN]
+INV_STD = [1.0 / s for s in STD]
 
 
 def imagenet_preprocess():
-    return T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
+    return T.Normalize(mean=MEAN, std=STD)
 
 
 def rescale(x):
@@ -21,8 +21,8 @@ def rescale(x):
 
 def imagenet_deprocess(rescale_image=True):
     transforms = [
-        T.Normalize(mean=[0, 0, 0], std=INV_IMAGENET_STD),
-        T.Normalize(mean=INV_IMAGENET_MEAN, std=[1.0, 1.0, 1.0]),
+        T.Normalize(mean=[0, 0, 0], std=INV_STD),
+        T.Normalize(mean=INV_MEAN, std=[1.0, 1.0, 1.0]),
     ]
     if rescale_image:
         transforms.append(rescale)

@@ -89,7 +89,7 @@ class Model(nn.Module):
         ngf = 64
         n_blocks_global = 9
         norm = 'instance'
-        self.pix2pix = define_G(netG_input_nc, output_nc, ngf, n_downsample_global, n_blocks_global, norm)
+        self.layout_to_image = define_G(netG_input_nc, output_nc, ngf, n_downsample_global, n_blocks_global, norm)
 
     def forward(self, gt_imgs, objs, triples, obj_to_img, boxes_gt=None, masks_gt=None, attributes=None,
                 gt_train=False, test_mode=False, use_gt_box=False, features=None):
@@ -114,13 +114,13 @@ class Model(nn.Module):
             gt_layout = None
             pred_layout = masks_to_layout(scene_layout_vecs, boxes, masks, obj_to_img, H, W, test_mode=True)
             wrong_layout = None
-            imgs_pred = self.pix2pix(pred_layout)
+            imgs_pred = self.layout_to_image(pred_layout)
         else:
             gt_layout = masks_to_layout(scene_layout_vecs, boxes_gt, masks_gt, obj_to_img, H, W, test_mode=False)
             pred_layout = masks_to_layout(scene_layout_vecs, boxes_gt, masks_pred, obj_to_img, H, W, test_mode=False)
             wrong_layout = masks_to_layout(wrong_layout_vecs, boxes_gt, masks_gt, obj_to_img, H, W, test_mode=False)
 
-            imgs_pred = self.pix2pix(gt_layout)
+            imgs_pred = self.layout_to_image(gt_layout)
         return imgs_pred, boxes_pred, masks_pred, gt_layout, pred_layout, wrong_layout
 
     def scene_graph_to_vectors(self, objs, triples, attributes):
@@ -151,12 +151,10 @@ class Model(nn.Module):
             .view(O, self.mask_noise_dim)
         mask_vecs = torch.cat([mask_vecs, layout_noise], dim=1)
 
-        if gt_train:
-            # create encoding
-            crops = crop_bbox_batch(imgs, boxes, obj_to_img, self.object_size)
-            obj_repr = self.repr_net(self.image_encoder(crops))
-        else:
-            obj_repr = self.repr_net(mask_vecs)
+        # create encoding
+        crops = crop_bbox_batch(imgs, boxes, obj_to_img, self.object_size)
+        obj_repr = self.repr_net(self.image_encoder(crops))
+
         # Only in inference time
         if features is not None:
             for ind, feature in enumerate(features):

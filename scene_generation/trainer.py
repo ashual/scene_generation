@@ -246,7 +246,7 @@ class Trainer:
             pred_real = self.netD.forward(torch.cat((layout, imgs), dim=1))
 
             # Train image generation
-            match_layout = layout.detach()  # if use_gt else layout_pred.detach()
+            match_layout = layout.detach()
             img_pred_fake = self.netD.forward(torch.cat((match_layout, imgs_pred), dim=1))
             g_gan_img_loss = self.criterionGAN(img_pred_fake, True)
             self.generator_losses.add_loss(g_gan_img_loss, 'g_gan_img_loss', args.d_img_weight)
