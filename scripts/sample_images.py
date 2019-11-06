@@ -22,7 +22,7 @@ parser.add_argument('--checkpoint_list', default=None)
 parser.add_argument('--model_mode', default='eval', choices=['train', 'eval'])
 
 # Shared dataset options
-parser.add_argument('--dataset', default='coco', choices=['coco', 'vg'])
+parser.add_argument('--dataset', default='coco')
 parser.add_argument('--image_size', default=(128, 128), type=int_tuple)
 parser.add_argument('--batch_size', default=24, type=int)
 parser.add_argument('--shuffle', default=False, type=bool_flag)
@@ -37,7 +37,6 @@ parser.add_argument('--use_gt_textures', default=False, type=bool_flag)
 parser.add_argument('--save_layout', default=False, type=bool_flag)
 parser.add_argument('--sample_attributes', default=False, type=bool_flag)
 parser.add_argument('--sample_features', default=False, type=bool_flag)
-parser.add_argument('--best_first_part', default=False, type=bool_flag)
 parser.add_argument('--object_size', default=64, type=int)
 parser.add_argument('--grid_size', default=25, type=int)
 
@@ -154,7 +153,7 @@ def run_model(args, checkpoint, output_dir, loader=None):
         features_path = os.path.join(dirname, 'features_clustered_001.npy')
         print(features_path)
         if os.path.isfile(features_path):
-            features = np.load(features_path).item()
+            features = np.load(features_path, allow_pickle=True).item()
         else:
             raise ValueError('No features file')
     with torch.no_grad():
@@ -202,12 +201,21 @@ def run_model(args, checkpoint, output_dir, loader=None):
             model_out = model(imgs, objs, triples, obj_to_img, boxes_gt=boxes, masks_gt=masks_gt, attributes=attributes,
                               gt_train=gt_train, test_mode=True, use_gt_box=args.use_gt_boxes, features=all_features)
             imgs_pred, boxes_pred, masks_pred, _, layout, _ = model_out
+            # Remove the __image__ object
+            boxes_pred_no_image = []
+            boxes_gt_no_image = []
+            for o_index in range(len(obj_to_img)):
+                if o_index < len(obj_to_img) - 1 and obj_to_img[o_index] == obj_to_img[o_index+1]:
+                    boxes_pred_no_image.append(boxes_pred[o_index])
+                    boxes_gt_no_image.append(boxes[o_index])
+            boxes_pred_no_image = torch.stack(boxes_pred_no_image)
+            boxes_gt_no_image = torch.stack(boxes_gt_no_image)
 
-            iou, bigger_05, bigger_03 = jaccard(boxes_pred, boxes)
+            iou, bigger_05, bigger_03 = jaccard(boxes_pred_no_image, boxes_gt_no_image)
             total_iou += iou
             r_05 += bigger_05
             r_03 += bigger_03
-            total_boxes += boxes_pred.size(0)
+            total_boxes += boxes_pred_no_image.size(0)
             imgs_pred = imagenet_deprocess_batch(imgs_pred)
 
             obj_data = [objs, boxes_pred, masks_pred]
@@ -257,7 +265,7 @@ def run_model(args, checkpoint, output_dir, loader=None):
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    if args.checkpoint is not None:
+    if args.checkpoint is None:
         raise ValueError('Must specify --checkpoint')
 
     checkpoint = torch.load(args.checkpoint)

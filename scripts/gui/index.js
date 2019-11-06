@@ -178,7 +178,7 @@ window.onload = function () {
     function refresh_image(response) {
         response = JSON.parse(response);
         document.getElementById("img_pred").src = response.img_pred;
-        // document.getElementById("layout_pred").src = response.layout_pred;
+        document.getElementById("layout_pred").src = response.layout_pred;
     }
 
     function addRow(obj, size, location, feature) {

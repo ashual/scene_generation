@@ -10,28 +10,27 @@ from imageio import imwrite
 
 from scene_generation.data.utils import imagenet_deprocess_batch
 from scene_generation.model import Model
-
-# import code.vis as vis
+import scene_generation.vis as vis
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--checkpoint', required=True)
 parser.add_argument('--output_dir', default='outputs')
 parser.add_argument('--draw_scene_graphs', type=int, default=0)
 parser.add_argument('--device', default='gpu', choices=['cpu', 'gpu'])
+args = parser.parse_args()
 
 
 def get_model():
-    args = parser.parse_args()
-    print(args.checkpoint)
     if not os.path.isfile(args.checkpoint):
         print('ERROR: Checkpoint file "%s" not found' % args.checkpoint)
         print('Maybe you forgot to download pretraind models? Try running:')
         print('bash scripts/download_models.sh')
         return
 
-    if not os.path.isdir(args.output_dir):
+    output_dir = os.path.join('scripts', 'gui', 'images', args.output_dir)
+    if not os.path.isdir(output_dir):
         print('Output directory "%s" does not exist; creating it' % args.output_dir)
-        os.makedirs(args.output_dir)
+        os.makedirs(output_dir)
 
     if args.device == 'cpu':
         device = torch.device('cpu')
@@ -45,26 +44,27 @@ def get_model():
     map_location = 'cpu' if device == torch.device('cpu') else None
     checkpoint = torch.load(args.checkpoint, map_location=map_location)
     dirname = os.path.dirname(args.checkpoint)
-    features_path = os.path.join(dirname, 'features_clustered_010.npy')
-    if os.path.isfile(features_path):
-        features = np.load(features_path).item()
-    else:
-        features = None
+    features_path = os.path.join(dirname, 'features_clustered_100.npy')
+    features_path_one = os.path.join(dirname, 'features_clustered_001.npy')
+    features = np.load(features_path, allow_pickle=True).item()
+    features_one = np.load(features_path_one, allow_pickle=True).item()
     model = Model(**checkpoint['model_kwargs'])
     model_state = checkpoint['model_state']
     model.load_state_dict(model_state)
     model.features = features
-    model.colors = torch.randint(0, 256, [134, 3]).float()
+    model.features_one = features_one
+    model.colors = torch.randint(0, 256, [172, 3]).float()
     model.eval()
     model.to(device)
     return model
 
 
 def json_to_img(scene_graph, model):
+    output_dir = args.output_dir
     scene_graphs = json_to_scene_graph(scene_graph)
     current_time = datetime.now().strftime('%b%d_%H-%M-%S')
 
-    print(scene_graphs, current_time)
+    # print(scene_graphs, current_time)
     # Run the model forward
     with torch.no_grad():
         imgs, boxes_pred, masks_pred, layout, layout_pred, _ = model.forward_json(scene_graphs)
@@ -73,21 +73,23 @@ def json_to_img(scene_graph, model):
     # Save the generated images
     for i in range(imgs.shape[0]):
         img_np = imgs[i].numpy().transpose(1, 2, 0)
-        img_path = os.path.join('scripts', 'gui', 'images', 'img{}.png'.format(current_time))
+        img_path = os.path.join('scripts', 'gui', 'images', output_dir, 'img{}.png'.format(current_time))
         imwrite(img_path, img_np)
-        return_img_path = os.path.join('images', 'img{}.png'.format(current_time))
+        return_img_path = os.path.join('images', output_dir, 'img{}.png'.format(current_time))
 
     # Save the generated images
     for i in range(imgs.shape[0]):
-        img_layout_np = one_hot_to_rgb(layout_pred[:, :134, :, :], model.colors)[0].numpy().transpose(1, 2, 0)
-        img_layout_path = os.path.join('scripts', 'gui', 'images', 'img_layout{}.png'.format(current_time))
+        img_layout_np = one_hot_to_rgb(layout_pred[:, :172, :, :], model.colors)[0].numpy().transpose(1, 2, 0)
+        img_layout_path = os.path.join('scripts', 'gui', 'images', output_dir, 'img_layout{}.png'.format(current_time))
         imwrite(img_layout_path, img_layout_np)
-        return_img_layout_path = os.path.join('images', 'img_layout{}.png'.format(current_time))
+        return_img_layout_path = os.path.join('images', output_dir, 'img_layout{}.png'.format(current_time))
+
     # Draw the scene graphs
-    # for i, sg in enumerate(scene_graphs):
-    #     sg_img = vis.draw_scene_graph(sg['objects'], sg['relationships'])
-    #     sg_img_path = os.path.join('images', 'sg%06d.png' % i)
-    #     imwrite(sg_img_path, sg_img)
+    if args.draw_scene_graphs:
+        for i, sg in enumerate(scene_graphs):
+            sg_img = vis.draw_scene_graph(sg['objects'], sg['relationships'])
+            sg_img_path = os.path.join('scripts', 'gui', 'images', output_dir, 'sg{}.png'.format(current_time))
+            imwrite(sg_img_path, sg_img)
     return return_img_path, return_img_layout_path
 
 

@@ -13,11 +13,9 @@ class StaticServer(BaseHTTPRequestHandler):
 
     def do_GET(self):
         root = os.path.dirname(os.path.realpath(__file__))
-        print(self.path)
         path = unquote(self.path)
-        print(path)
         if path == '/':
-            filename = root + '/index_panoptic.html'
+            filename = root + '/index.html'
         elif path.startswith('/get_data?'):
             img_path, layout_path = json_to_img(path.split('/get_data?data=')[1], model)
             self.send_response(200)

@@ -23,30 +23,30 @@ The IEEE International Conference on Computer Vision ([ICCV](http://iccv2019.the
 All code was developed and tested on Ubuntu 18.04 with Python 3.6 (Anaconda) and PyTorch 1.0.
 
 ```bash
-$ conda create -n scene_generation python=3.7
-$ conda activate scene_generation
+conda create -n scene_generation python=3.7
+conda activate scene_generation
 ```
 ### 2. Cloning the repository
 ```bash
-$ cd ~
-$ git clone git@github.com:ashual/scene_generation.git
-$ cd scene_generation
+cd ~
+git clone git@github.com:ashual/scene_generation.git
+cd scene_generation
 ```
 
 ### 3. Installing dependencies
 ```bash
-$ conda install --file requirements.txt -c conda-forge -c pytorch
+conda install --file requirements.txt -c conda-forge -c pytorch
 ```
 * install pytorch which will fit your CUDA TOOLKIT
 
 ### 4. Install COCO API
 Note: we didn't trained our models with COCO panoptic dataset, the coco_panoptic.py code is for the sake of the community only.
 ```bash
-$ cd ~
-$ git clone https://github.com/cocodataset/cocoapi.git
-$ cd cocoapi/PythonAPI/
-$ python setup.py install
-$ cd ~/scene_generation
+cd ~
+git clone https://github.com/cocodataset/cocoapi.git
+cd cocoapi/PythonAPI/
+python setup.py install
+cd ~/scene_generation
 ```
 
 ### 5. Training
@@ -56,21 +56,23 @@ $ python train.py
 
 ### 6. Encoding the Appearance features
 ```bash
-$ python scripts/encode_features --checkpoint TRAINED_MODEL_CHECKPOINT
+python scripts/encode_features --checkpoint TRAINED_MODEL_CHECKPOINT
 ```
 
 ### 7. SAMPLE IMAGES
 ```bash
-$ python scripts/sample_images.py --checkpoint TRAINED_MODEL_CHECKPOINT
+python scripts/sample_images.py --checkpoint TRAINED_MODEL_CHECKPOINT --sample_features 1 --batch_size 32 --output_dir OUTPUT_DIR 
 ```
 
 ### 8. or Downloading trained models
-TBA
+Download these files into models/
+https://drive.google.com/drive/folders/1_E56YskDXdmq06FRsIiPAedpBovYOO8X?usp=sharing
+
 
 ### 7. GUI
 The GUI was built as POC. Use it at your own risk:
 ```bash
-python scripts/gui/simple-server.py --checkpoint YOUR_MODEL_CHECKPOINT
+python scripts/gui/simple-server.py --checkpoint YOUR_MODEL_CHECKPOINT --output_dir [DIR_NAME] --draw_scene_graphs 1
 ```
 
 ## Citation

@@ -2,18 +2,18 @@ import torch
 import torch.nn as nn
 
 from scene_generation.bilinear import crop_bbox_batch
+from scene_generation.generators import mask_net, AppearanceEncoder, define_G
 from scene_generation.graph import GraphTripleConv, GraphTripleConvNet
 from scene_generation.layers import build_mlp
 from scene_generation.layout import masks_to_layout
 from scene_generation.utils import VectorPool
-from scene_generation.generators import mask_net, AppearanceEncoder, define_G
 
 
 class Model(nn.Module):
     def __init__(self, vocab, image_size=(64, 64), embedding_dim=128,
                  gconv_dim=128, gconv_hidden_dim=512,
                  gconv_pooling='avg', gconv_num_layers=5,
-                 mask_size=None, mlp_normalization='none', appearance_normalization='', activation='',
+                 mask_size=32, mlp_normalization='none', appearance_normalization='', activation='',
                  n_downsample_global=4, box_dim=128,
                  use_attributes=False, box_noise_dim=64,
                  mask_noise_dim=64, pool_size=100, rep_size=32):
@@ -97,7 +97,7 @@ class Model(nn.Module):
         obj_vecs, pred_vecs = self.scene_graph_to_vectors(objs, triples, attributes)
 
         box_vecs, mask_vecs, scene_layout_vecs, wrong_layout_vecs = \
-            self.create_components_vecs(gt_imgs, boxes_gt, obj_to_img, objs, obj_vecs, gt_train, features)
+            self.create_components_vecs(gt_imgs, boxes_gt, obj_to_img, objs, obj_vecs, features)
 
         # Generate Boxes
         boxes_pred = self.box_net(box_vecs)
@@ -142,7 +142,7 @@ class Model(nn.Module):
 
         return obj_vecs, pred_vecs
 
-    def create_components_vecs(self, imgs, boxes, obj_to_img, objs, obj_vecs, gt_train, features):
+    def create_components_vecs(self, imgs, boxes, obj_to_img, objs, obj_vecs, features):
         O = objs.size(0)
         box_vecs = obj_vecs
         mask_vecs = obj_vecs
@@ -152,11 +152,12 @@ class Model(nn.Module):
         mask_vecs = torch.cat([mask_vecs, layout_noise], dim=1)
 
         # create encoding
-        crops = crop_bbox_batch(imgs, boxes, obj_to_img, self.object_size)
-        obj_repr = self.repr_net(self.image_encoder(crops))
-
-        # Only in inference time
-        if features is not None:
+        if features is None:
+            crops = crop_bbox_batch(imgs, boxes, obj_to_img, self.object_size)
+            obj_repr = self.repr_net(self.image_encoder(crops))
+        else:
+            # Only in inference time
+            obj_repr = self.repr_net(mask_vecs)
             for ind, feature in enumerate(features):
                 if feature is not None:
                     obj_repr[ind, :] = feature
@@ -220,8 +221,13 @@ class Model(nn.Module):
                 obj_to_img.append(i)
             if self.features is not None:
                 for obj_name, feat_num in zip(objs, sg['features']):
-                    feat = torch.from_numpy(self.features[obj_name][min(feat_num, 9), :]).type(torch.float32).to(
-                        device) if feat_num != -1 else None
+                    if feat_num == -1:
+                        feat = self.features_one[obj_name][0]
+                    else:
+                        feat = self.features[obj_name][min(feat_num, 99), :]
+                    feat = torch.from_numpy(feat).type(torch.float32).to(device)
+                    if obj_name == 0:
+                        feat = None
                     all_features.append(feat)
             for s, p, o in sg['relationships']:
                 pred_idx = self.vocab['pred_name_to_idx'].get(p, None)

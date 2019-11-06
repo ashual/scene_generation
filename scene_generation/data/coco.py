@@ -23,7 +23,7 @@ class CocoSceneGraphDataset(Dataset):
                  normalize_images=True, max_samples=None, min_object_size=0.02,
                  min_objects_per_image=3, max_objects_per_image=8, include_other=False, instance_whitelist=None,
                  stuff_whitelist=None, no__img__=False, sample_attributes=False, val_part=False, size_attribute_len=10,
-                 location_attribute_len=25):
+                 grid_size=25):
         """
         A PyTorch Dataset for loading Coco and Coco-Stuff annotations and converting
         them to scene graphs on the fly.
@@ -78,7 +78,7 @@ class CocoSceneGraphDataset(Dataset):
         self.image_id_to_objects = defaultdict(list)
 
         self.size_attribute_len = size_attribute_len
-        self.location_attribute_len = location_attribute_len
+        self.location_attribute_len = grid_size
 
         instances_data, stuff_data = self.load_data(instances_json, stuff_json)
         if instance_whitelist is None:
