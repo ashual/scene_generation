@@ -5,7 +5,7 @@ A PyTorch implementation of the paper [Specifying Object Attributes and Relation
 ## Paper
 [Specifying Object Attributes and Relations in Interactive Scene Generation](https://arxiv.org/abs/1909.05379)
 <br/>
-[Oron Ashual](https://)<sup>1</sup>, [Lior Wolf](https://www.cs.tau.ac.il/~wolf/)<sup>1,2</sup><br/>
+[Oron Ashual](https://www.linkedin.com/in/oronashual/)<sup>1</sup>, [Lior Wolf](https://www.cs.tau.ac.il/~wolf/)<sup>1,2</sup><br/>
 <sup>1 </sup> Tel-Aviv University, <sup>2 </sup> Facebook AI Research <br/>
 The IEEE International Conference on Computer Vision ([ICCV](http://iccv2019.thecvf.com/)), 2019, (<b>Oral</b>)
 
@@ -19,21 +19,21 @@ The IEEE International Conference on Computer Vision ([ICCV](http://iccv2019.the
 
 ## Usage
 
-### 1. Creating virtual environment (optional)
+### 1. Create virtual environment (optional)
 All code was developed and tested on Ubuntu 18.04 with Python 3.6 (Anaconda) and PyTorch 1.0.
 
 ```bash
 conda create -n scene_generation python=3.7
 conda activate scene_generation
 ```
-### 2. Cloning the repository
+### 2. Clone the repository
 ```bash
 cd ~
 git clone git@github.com:ashual/scene_generation.git
 cd scene_generation
 ```
 
-### 3. Installing dependencies
+### 3. Install dependencies
 ```bash
 conda install --file requirements.txt -c conda-forge -c pytorch
 ```
@@ -49,27 +49,26 @@ python setup.py install
 cd ~/scene_generation
 ```
 
-### 5. Training
+### 5. Train
 ```bash
 $ python train.py
 ```
 
-### 6. Encoding the Appearance features
+### 6. Encode the Appearance attributes
 ```bash
 python scripts/encode_features --checkpoint TRAINED_MODEL_CHECKPOINT
 ```
 
-### 7. SAMPLE IMAGES
+### 7. Sample Images
 ```bash
 python scripts/sample_images.py --checkpoint TRAINED_MODEL_CHECKPOINT --sample_features 1 --batch_size 32 --output_dir OUTPUT_DIR 
 ```
 
-### 8. or Downloading trained models
-Download these files into models/
-https://drive.google.com/drive/folders/1_E56YskDXdmq06FRsIiPAedpBovYOO8X?usp=sharing
+### 8. or Download trained models
+Download [these](https://drive.google.com/drive/folders/1_E56YskDXdmq06FRsIiPAedpBovYOO8X?usp=sharing) files into models/
 
 
-### 7. GUI
+### 7. Play with the GUI
 The GUI was built as POC. Use it at your own risk:
 ```bash
 python scripts/gui/simple-server.py --checkpoint YOUR_MODEL_CHECKPOINT --output_dir [DIR_NAME] --draw_scene_graphs 1

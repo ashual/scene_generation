@@ -38,8 +38,6 @@ def build_coco_dset(args, checkpoint):
     dset_kwargs = {
         'image_dir': args.coco_image_dir,
         'instances_json': args.instances_json,
-        'panoptic': checkpoint_args['coco_panoptic_train'],
-        'panoptic_segmentation': checkpoint_args['coco_panoptic_segmentation_train'],
         'stuff_json': args.stuff_json,
         'image_size': args.image_size,
         'mask_size': checkpoint_args['mask_size'],
@@ -50,7 +48,7 @@ def build_coco_dset(args, checkpoint):
         'stuff_whitelist': checkpoint_args['stuff_whitelist'],
         'include_other': checkpoint_args.get('coco_include_other', True),
     }
-    dset = CocoPanopticSceneGraphDataset(**dset_kwargs)
+    dset = CocoSceneGraphDataset(**dset_kwargs)
     return dset
 
 
@@ -69,7 +67,7 @@ def build_model(args, checkpoint):
 
 def build_loader(args, checkpoint):
     dset = build_coco_dset(args, checkpoint)
-    collate_fn = coco_panoptic_collate_fn
+    collate_fn = coco_collate_fn
 
     loader_kwargs = {
         'batch_size': args.batch_size,

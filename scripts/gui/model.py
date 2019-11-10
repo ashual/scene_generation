@@ -72,14 +72,14 @@ def json_to_img(scene_graph, model):
 
     # Save the generated images
     for i in range(imgs.shape[0]):
-        img_np = imgs[i].numpy().transpose(1, 2, 0)
+        img_np = imgs[i].numpy().transpose(1, 2, 0).astype('uint8')
         img_path = os.path.join('scripts', 'gui', 'images', output_dir, 'img{}.png'.format(current_time))
         imwrite(img_path, img_np)
         return_img_path = os.path.join('images', output_dir, 'img{}.png'.format(current_time))
 
     # Save the generated images
     for i in range(imgs.shape[0]):
-        img_layout_np = one_hot_to_rgb(layout_pred[:, :172, :, :], model.colors)[0].numpy().transpose(1, 2, 0)
+        img_layout_np = one_hot_to_rgb(layout_pred[:, :172, :, :], model.colors)[0].numpy().transpose(1, 2, 0).astype('uint8')
         img_layout_path = os.path.join('scripts', 'gui', 'images', output_dir, 'img_layout{}.png'.format(current_time))
         imwrite(img_layout_path, img_layout_np)
         return_img_layout_path = os.path.join('images', output_dir, 'img_layout{}.png'.format(current_time))
@@ -155,4 +155,4 @@ def json_to_scene_graph(json_text):
         relationships.append([i, p, i + 1])
 
     return [{'objects': objects, 'relationships': relationships, 'attributes': {'size': size, 'location': location},
-             'features': features}]
+             'features': features, 'image_id': image_id}]

@@ -104,12 +104,9 @@ window.onload = function () {
             target.setAttribute('data-size', new_size);
             target.style.fontSize = new_size * 10 + 10;
             // $(event.currentTarget).remove();
+            selectItem(event, event.target);
             render_button();
             event.preventDefault();
-        })
-        .on('doubletap', function (event) {
-            console.log('doubletap');
-            selectItem(event, event.currentTarget, true);
         })
         .on('hold', function (event) {
             console.log('hold');
@@ -119,17 +116,23 @@ window.onload = function () {
         });
 
     function selectItem(event, target, should_deselect) {
-        // debugger;
         event.stopPropagation();
         var hasClass = $(target).hasClass('selected');
         $(".resize-drag").removeClass("selected");
         $('#range-slider').attr('data-id', '');
         if (should_deselect && hasClass){
-            $(target).removeClass("selected");
+            // var image_style = $('#range-slider').attr('image-id');
+            // image_style = image_style ? image_style : -1;
+            // $('#range-slider').data(image_style);
+            // $('.range-slider__value').text(image_style.toString());
         } else {
             $(target).addClass("selected");
             // event.currentTarget.classList.toggle('switch-bg');
             $('#range-slider').attr('data-id', target.id);
+            var style = target.getAttribute('data-style');
+            style = style ? style : -1;
+            $('#range-slider').val(style);
+            $('.range-slider__value').text(style.toString());
         }
 
         // render_button();
@@ -140,7 +143,6 @@ window.onload = function () {
         $(".resize-drag").removeClass("selected");
         $(this).addClass("selected");
         e.stopPropagation();
-        debugger;
     });
 
     function guidGenerator() {
@@ -239,11 +241,12 @@ window.onload = function () {
                 'location': location,
             });
             console.log(size, location, text);
-            addRow(text, size, location, style)
+            addRow(text, size, location, style);
         }
         console.log(allObjects);
         var image_id = document.getElementById('range-slider').getAttribute('image-id');
         var image_feature = image_id ? parseInt(image_id) : -1;
+        addRow('background', '-', '-', image_feature);
         var results = {'image_id': image_feature, 'objects': allObjects};
         var url = 'get_data?data=' + JSON.stringify(results);
         var xmlHttp = new XMLHttpRequest();
@@ -260,8 +263,13 @@ window.onload = function () {
     // document.getElementById("render-button").addEventListener("click", render_button);
     document.querySelectorAll("ul.drop-menu > li").forEach(function(e){e.addEventListener("click", stuff_add)})
     $(window).click(function(devt) {
-        if (!devt.target.getAttribute('data-x') && !devt.target.getAttribute('max')){
+        if (!devt.target.getAttribute('data-size') && !devt.target.getAttribute('max')){
             $(".resize-drag").removeClass("selected");
+            var image_style = $('#range-slider').attr('image-id');
+            image_style = image_style ? parseInt(image_style) : -1;
+            $('#range-slider').val(image_style);
+            $('.range-slider__value').text(image_style.toString());
+            $('#range-slider').attr('data-id', '');
         }
     });
 }

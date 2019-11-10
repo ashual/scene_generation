@@ -208,7 +208,7 @@ class Model(nn.Module):
             attributes = torch.zeros([len(sg['objects']) + 1, 25 + 10], dtype=torch.float, device=device)
             # Insert dummy __image__ object and __in_image__ relationships
             sg['objects'].append('__image__')
-            sg['features'].append(0)
+            sg['features'].append(sg['image_id'])
             image_idx = len(sg['objects']) - 1
             for j in range(image_idx):
                 sg['relationships'].append([j, '__in_image__', image_idx])
@@ -226,8 +226,6 @@ class Model(nn.Module):
                     else:
                         feat = self.features[obj_name][min(feat_num, 99), :]
                     feat = torch.from_numpy(feat).type(torch.float32).to(device)
-                    if obj_name == 0:
-                        feat = None
                     all_features.append(feat)
             for s, p, o in sg['relationships']:
                 pred_idx = self.vocab['pred_name_to_idx'].get(p, None)
