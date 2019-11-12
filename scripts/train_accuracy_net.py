@@ -12,54 +12,54 @@ import torchvision
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 
+from scene_generation.bilinear import crop_bbox_batch
 from scene_generation.data.coco import CocoSceneGraphDataset, coco_collate_fn
 from scene_generation.utils import int_tuple, bool_flag, str_tuple
-from scene_generation.layers import Interpolate
 
+parser = argparse.ArgumentParser(description='Training a pytorch model to classify different plants')
+parser.add_argument('-idl', '--input_data_loc', help='', default='data/training_data')
+parser.add_argument('-mo', '--model_name', default="resnet101")
+parser.add_argument('-f', '--freeze_layers', default=True, action='store_false', help='Bool type')
+parser.add_argument('-fi', '--freeze_initial_layers', default=True, action='store_false', help='Bool type')
+parser.add_argument('-ep', '--epochs', default=20, type=int)
+parser.add_argument('-b', '--batch_size', default=4, type=int)
+parser.add_argument('-is', '--input_shape', default=224, type=int)
+parser.add_argument('-sl', '--save_loc', default="models/")
+parser.add_argument("-g", '--use_gpu', default=True, action='store_false', help='Bool type gpu')
+parser.add_argument("-p", '--use_parallel', default=False, action='store_false', help='Bool type to use_parallel')
+
+parser.add_argument('--dataset', default='coco', type=str)
+parser.add_argument('--mask_size', default=32, type=int)
+parser.add_argument('--image_size', default='256,256', type=int_tuple)
+parser.add_argument('--num_train_samples', default=None, type=int)
+parser.add_argument('--num_val_samples', default=1024, type=int)
+parser.add_argument('--shuffle_val', default=True, type=bool_flag)
+parser.add_argument('--loader_num_workers', default=4, type=int)
+parser.add_argument('--include_relationships', default=True, type=bool_flag)
+
+# COCO-specific options
 COCO_DIR = os.path.expanduser('datasets/coco')
-
-"""
-resnet18, resnet34, resnet50, resnet101, resnet152
-densenet121, densenet161, densenet169, densenet201
-squeezenet1_0, squeezenet1_1
-alexnet,
-inception_v3,
-vgg11, vgg13, vgg16, vgg19
-vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn
-
-
-Its quite messed up or I messed it a bit.
-
-- If you want to freeze the layers by its name
-
-for name, params in model_conv.named_parameters():
-    if name =! "something":
-        params.requires_grad=False
-
-- If you want to freeze the first few layers
-
-```
-model_ft = models.resnet50(pretrained=True)
-ct = 0
-for child in model_ft.children():
-ct += 1
-if ct < 7:
-    for param in child.parameters():
-        param.requires_grad = False
-```
-
-ct = []
-for name, child in model_conv.named_children():
-    if "layer1" in ct:
-        execute this
-    ct.append(name)
+parser.add_argument('--coco_train_image_dir',
+                    default=os.path.join(COCO_DIR, 'images/train2017'))
+parser.add_argument('--coco_val_image_dir',
+                    default=os.path.join(COCO_DIR, 'images/val2017'))
+parser.add_argument('--coco_train_instances_json',
+                    default=os.path.join(COCO_DIR, 'annotations/instances_train2017.json'))
+parser.add_argument('--coco_train_stuff_json',
+                    default=os.path.join(COCO_DIR, 'annotations/stuff_train2017.json'))
+parser.add_argument('--coco_val_instances_json',
+                    default=os.path.join(COCO_DIR, 'annotations/instances_val2017.json'))
+parser.add_argument('--coco_val_stuff_json',
+                    default=os.path.join(COCO_DIR, 'annotations/stuff_val2017.json'))
+parser.add_argument('--instance_whitelist', default=None, type=str_tuple)
+parser.add_argument('--stuff_whitelist', default=None, type=str_tuple)
+parser.add_argument('--coco_include_other', default=False, type=bool_flag)
+parser.add_argument('--min_object_size', default=0.02, type=float)
+parser.add_argument('--min_objects_per_image', default=3, type=int)
+parser.add_argument('--coco_stuff_only', default=True, type=bool_flag)
 
 
-"""
-
-
-def all_pretrained_models(n_class, use_gpu=True, freeze_layers=False, freeze_initial_layers=False, name="resnet18",
-                          pretrained=True):
+def all_pretrained_models(n_class, name="resnet101", pretrained=True):
     if pretrained:
         weights = "imagenet"
     else:
@@ -101,50 +101,12 @@ def all_pretrained_models(n_class, use_gpu=True, freeze_layers=False, freeze_ini
     return model_conv
 
 
-parser = argparse.ArgumentParser(description='Training a pytorch model to classify different plants')
-parser.add_argument('-idl', '--input_data_loc', help='', default='data/training_data')
-parser.add_argument('-mo', '--model_name', default="resnet101")
-parser.add_argument('-f', '--freeze_layers', default=True, action='store_false', help='Bool type')
-parser.add_argument('-fi', '--freeze_initial_layers', default=True, action='store_false', help='Bool type')
-parser.add_argument('-ep', '--epochs', default=20, type=int)
-parser.add_argument('-b', '--batch_size', default=4, type=int)
-parser.add_argument('-is', '--input_shape', default=224, type=int)
-parser.add_argument('-sl', '--save_loc', default="models/")
-parser.add_argument("-g", '--use_gpu', default=True, action='store_false', help='Bool type gpu')
-parser.add_argument("-p", '--use_parallel', default=False, action='store_false', help='Bool type to use_parallel')
-
-parser.add_argument('--dataset', default='coco', type=str)
-parser.add_argument('--mask_size', default=32, type=int)
-parser.add_argument('--image_size', default='256,256', type=int_tuple)
-parser.add_argument('--num_train_samples', default=None, type=int)
-parser.add_argument('--num_val_samples', default=1024, type=int)
-parser.add_argument('--shuffle_val', default=True, type=bool_flag)
-parser.add_argument('--loader_num_workers', default=4, type=int)
-# COCO-specific options
-parser.add_argument('--coco_train_image_dir',
-                    default=os.path.join(COCO_DIR, 'images/train2017'))
-parser.add_argument('--coco_val_image_dir',
-                    default=os.path.join(COCO_DIR, 'images/val2017'))
-parser.add_argument('--coco_train_instances_json',
-                    default=os.path.join(COCO_DIR, 'annotations/instances_train2017.json'))
-parser.add_argument('--coco_train_stuff_json',
-                    default=os.path.join(COCO_DIR, 'annotations/stuff_train2017.json'))
-parser.add_argument('--coco_val_instances_json',
-                    default=os.path.join(COCO_DIR, 'annotations/instances_val2017.json'))
-parser.add_argument('--coco_val_stuff_json',
-                    default=os.path.join(COCO_DIR, 'annotations/stuff_val2017.json'))
-parser.add_argument('--instance_whitelist', default=None, type=str_tuple)
-parser.add_argument('--stuff_whitelist', default=None, type=str_tuple)
-parser.add_argument('--coco_include_other', default=False, type=bool_flag)
-parser.add_argument('--min_object_size', default=0.02, type=float)
-parser.add_argument('--min_objects_per_image', default=3, type=int)
-
-
 def build_coco_dsets(args):
     dset_kwargs = {
         'image_dir': args.coco_train_image_dir,
         'instances_json': args.coco_train_instances_json,
         'stuff_json': args.coco_train_stuff_json,
+        'stuff_only': args.coco_stuff_only,
         'image_size': args.image_size,
         'mask_size': args.mask_size,
         'max_samples': args.num_train_samples,
@@ -153,6 +115,7 @@ def build_coco_dsets(args):
         'instance_whitelist': args.instance_whitelist,
         'stuff_whitelist': args.stuff_whitelist,
         'include_other': args.coco_include_other,
+        'include_relationships': args.include_relationships,
         'no__img__': True
     }
     train_dset = CocoSceneGraphDataset(**dset_kwargs)
@@ -197,7 +160,7 @@ def train_model(model, test_dataloader, val_dataloader, criterion, optimizer, sc
     best_model_wts = model.state_dict()
     best_acc = 0.0
     device = 'cuda' if use_gpu else 'cpu'
-    interpolate = Interpolate(size=(input_shape, input_shape), mode='bilinear')
+
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
@@ -220,27 +183,21 @@ def train_model(model, test_dataloader, val_dataloader, criterion, optimizer, sc
             for data in dataloader:
                 # get the inputs
                 imgs, objs, boxes, masks, triples, obj_to_img, triple_to_img, attributes = data
-                # imgs = imgs.to(device)
-                masks = masks.float()
-                # boxes = boxes.to(device)
+                imgs = imgs.to(device)
+                boxes = boxes.to(device)
                 obj_to_img = obj_to_img.to(device)
                 labels = objs.to(device)
 
                 objects_len += obj_to_img.shape[0]
 
-                # with torch.no_grad():
-                #     crops = crop_bbox_batch(imgs, boxes, obj_to_img, input_shape)
-
-                # inputs = crops
-                inputs = torch.stack([masks, masks, masks], dim=1)
-                inputs = interpolate(inputs).to(device)
-                labels = labels.to(device)
+                with torch.no_grad():
+                    crops = crop_bbox_batch(imgs, boxes, obj_to_img, input_shape)
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
                 # forward
-                outputs = model(inputs)
+                outputs = model(crops)
                 if type(outputs) == tuple:
                     outputs, _ = outputs
                 _, preds = torch.max(outputs, 1)
@@ -255,8 +212,8 @@ def train_model(model, test_dataloader, val_dataloader, criterion, optimizer, sc
                 running_loss += loss.item()
                 running_corrects += torch.sum(preds == labels)
 
-            epoch_loss = running_loss / objects_len  # dataset_sizes[phase]
-            epoch_acc = running_corrects.item() / objects_len  # dataset_sizes[phase]
+            epoch_loss = running_loss / objects_len
+            epoch_acc = running_corrects.item() / objects_len
 
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
 
@@ -290,18 +247,13 @@ if __name__ == '__main__':
     print(args)
     device = 'cuda' if args.use_gpu else 'cpu'
     vocab, train_loader, val_loader = build_loaders(args)
-    # vocab, train_loader, val_loader = None, None, None
-    # dataloaders, dataset_sizes, class_names = generate_data(args.input_data_loc, args.input_shape, args.model_name, batch_size=args.batch_size)
-    # print(class_names)
     num_objs = 172  # len(vocab['object_to_idx'])
     print("[Load the model...]")
     # Parameters of newly constructed modules have requires_grad=True by default
     print(
         "Loading model using class: {}, use_gpu: {}, freeze_layers: {}, freeze_initial_layers: {}, name_of_model: {}".format(
             num_objs, args.use_gpu, args.freeze_layers, args.freeze_initial_layers, args.model_name))
-    model_conv = all_pretrained_models(num_objs, use_gpu=args.use_gpu, freeze_layers=args.freeze_layers,
-                                       freeze_initial_layers=args.freeze_initial_layers, name=args.model_name).to(
-        device)
+    model_conv = all_pretrained_models(num_objs, name=args.model_name).to(device)
     if args.use_parallel:
         print("[Using all the available GPUs]")
         model_conv = nn.DataParallel(model_conv, device_ids=[0, 1])
@@ -320,5 +272,5 @@ if __name__ == '__main__':
                            args.use_gpu, num_epochs=args.epochs, input_shape=args.input_shape)
 
     print("[Save the best model]")
-    model_save_loc = './{}_{}_classes_masks.pth'.format(args.model_name, num_objs)
+    model_save_loc = './{}_{}_classes.pth'.format(args.model_name, num_objs)
     torch.save(model_ft.state_dict(), model_save_loc)
