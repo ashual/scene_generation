@@ -19,7 +19,7 @@ The IEEE International Conference on Computer Vision ([ICCV](http://iccv2019.the
 
 ## Usage
 
-### 1. Create virtual environment (optional)
+### 1. Create a virtual environment (optional)
 All code was developed and tested on Ubuntu 18.04 with Python 3.6 (Anaconda) and PyTorch 1.0.
 
 ```bash
@@ -29,7 +29,7 @@ conda activate scene_generation
 ### 2. Clone the repository
 ```bash
 cd ~
-git clone git@github.com:ashual/scene_generation.git
+git clone https://github.com/ashual/scene_generation.git
 cd scene_generation
 ```
 
@@ -37,10 +37,10 @@ cd scene_generation
 ```bash
 conda install --file requirements.txt -c conda-forge -c pytorch
 ```
-* install pytorch which will fit your CUDA TOOLKIT
+* install a PyTorch version which will fit your CUDA TOOLKIT
 
 ### 4. Install COCO API
-Note: we didn't trained our models with COCO panoptic dataset, the coco_panoptic.py code is for the sake of the community only.
+Note: we didn't train our models with COCO panoptic dataset, the coco_panoptic.py code is for the sake of the community only.
 ```bash
 cd ~
 git clone https://github.com/cocodataset/cocoapi.git
@@ -61,18 +61,37 @@ python scripts/encode_features --checkpoint TRAINED_MODEL_CHECKPOINT
 
 ### 7. Sample Images
 ```bash
-python scripts/sample_images.py --checkpoint TRAINED_MODEL_CHECKPOINT --sample_features 1 --batch_size 32 --output_dir OUTPUT_DIR 
+python scripts/sample_images.py --checkpoint TRAINED_MODEL_CHECKPOINT --batch_size 32 --output_dir OUTPUT_DIR 
 ```
 
 ### 8. or Download trained models
 Download [these](https://drive.google.com/drive/folders/1_E56YskDXdmq06FRsIiPAedpBovYOO8X?usp=sharing) files into models/
 
 
-### 7. Play with the GUI
+### 9. Play with the GUI
 The GUI was built as POC. Use it at your own risk:
 ```bash
 python scripts/gui/simple-server.py --checkpoint YOUR_MODEL_CHECKPOINT --output_dir [DIR_NAME] --draw_scene_graphs 1
 ```
+
+### 10. Results
+Results were measured by sample images from the validation set and then running these 3 official scripts:
+1. FID - https://github.com/bioinf-jku/TTUR (Tensorflow implementation)
+2. Inception - https://github.com/openai/improved-gan/blob/master/inception_score/model.py (Tensorflow implementation)
+3. Diversity - https://github.com/richzhang/PerceptualSimilarity (Pytorch implementation)
+4. Accuracy - Training code is attached `train_accuracy_net.py`. A trained model is provided. Adding the argument --accuracy_model_path MODEL_PATH will output the accuracy of the objects. 
+
+#### Reproduce the comparison figure (Figure 3.)
+Run this command
+```bash
+$ python scripts/sample_images.py --checkpoint TRAINED_MODEL_CHECKPOINT --output_dir OUTPUT_DIR
+```
+ 
+with these arguments:  
+* (c) - Ground truth layout: --use_gt_boxes 1 --use_gt_masks 1
+* (d) - Ground truth location attributes: --use_gt_attr 1
+* (e) - Ground truth appearance attributes: --use_gt_textures 1
+* (f) - Scene Graph only - No extra attributes needed
 
 ## Citation
 

@@ -92,7 +92,7 @@ class Model(nn.Module):
         self.layout_to_image = define_G(netG_input_nc, output_nc, ngf, n_downsample_global, n_blocks_global, norm)
 
     def forward(self, gt_imgs, objs, triples, obj_to_img, boxes_gt=None, masks_gt=None, attributes=None,
-                gt_train=False, test_mode=False, use_gt_box=False, features=None):
+                test_mode=False, use_gt_box=False, features=None):
         O, T = objs.size(0), triples.size(0)
         obj_vecs, pred_vecs = self.scene_graph_to_vectors(objs, triples, attributes)
 
@@ -252,5 +252,5 @@ class Model(nn.Module):
     def forward_json(self, scene_graphs):
         """ Convenience method that combines encode_scene_graphs and forward. """
         objs, triples, obj_to_img, attributes, features = self.encode_scene_graphs(scene_graphs)
-        return self.forward(None, objs, triples, obj_to_img, attributes=attributes, gt_train=False, test_mode=True,
+        return self.forward(None, objs, triples, obj_to_img, attributes=attributes, test_mode=True,
                             use_gt_box=False, features=features)

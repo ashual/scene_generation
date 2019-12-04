@@ -91,11 +91,11 @@ def check_model(args, loader, model, inception_score, use_gt):
             # Run the model as it has been run during training
             if use_gt:
                 model_out = model(imgs, objs, triples, obj_to_img, boxes_gt=boxes, masks_gt=masks, attributes=attributes,
-                                  gt_train=True, test_mode=True, use_gt_box=True)
+                                  test_mode=True, use_gt_box=True)
             else:
                 attributes = torch.zeros_like(attributes)
                 model_out = model(imgs, objs, triples, obj_to_img, boxes_gt=boxes, masks_gt=None, attributes=attributes,
-                                  gt_train=True, test_mode=True, use_gt_box=False)
+                                  test_mode=True, use_gt_box=False)
             imgs_pred, boxes_pred, masks_pred, _, pred_layout, _ = model_out
 
             iou, _, _ = jaccard(boxes_pred, boxes)
@@ -196,7 +196,7 @@ def main(args):
             if not use_gt:
                 attributes = torch.zeros_like(attributes)
             model_out = trainer.model(imgs, objs, triples, obj_to_img,
-                                      boxes_gt=boxes, masks_gt=masks, attributes=attributes, gt_train=use_gt)
+                                      boxes_gt=boxes, masks_gt=masks, attributes=attributes)
             imgs_pred, boxes_pred, masks_pred, layout, layout_pred, layout_wrong = model_out
 
             layout_one_hot = layout[:, :trainer.num_obj, :, :]
