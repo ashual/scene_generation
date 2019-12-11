@@ -71,7 +71,7 @@ Download [these](https://drive.google.com/drive/folders/1_E56YskDXdmq06FRsIiPAed
 ### 9. Play with the GUI
 The GUI was built as POC. Use it at your own risk:
 ```bash
-python scripts/gui/simple-server.py --checkpoint YOUR_MODEL_CHECKPOINT --output_dir [DIR_NAME] --draw_scene_graphs 1
+python scripts/gui/simple-server.py --checkpoint YOUR_MODEL_CHECKPOINT --output_dir [DIR_NAME] --draw_scene_graphs 0
 ```
 
 ### 10. Results
@@ -79,7 +79,7 @@ Results were measured by sample images from the validation set and then running 
 1. FID - https://github.com/bioinf-jku/TTUR (Tensorflow implementation)
 2. Inception - https://github.com/openai/improved-gan/blob/master/inception_score/model.py (Tensorflow implementation)
 3. Diversity - https://github.com/richzhang/PerceptualSimilarity (Pytorch implementation)
-4. Accuracy - Training code is attached `train_accuracy_net.py`. A trained model is provided. Adding the argument --accuracy_model_path MODEL_PATH will output the accuracy of the objects. 
+4. Accuracy - Training code is attached `train_accuracy_net.py`. A trained model is provided. Adding the argument `--accuracy_model_path MODEL_PATH` will output the accuracy of the objects. 
 
 #### Reproduce the comparison figure (Figure 3.)
 Run this command

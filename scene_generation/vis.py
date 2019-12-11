@@ -80,7 +80,30 @@ def draw_layout(vocab, objs, boxes, masks=None, size=256,
                 draw_box(box, colors[i], name)
 
 
-def draw_box(box, color, text=None):
+def add_boxes_to_layout(img, objs, boxes, image_path, size=256, colors=None):
+    if colors is None:
+        cmap = plt.get_cmap('rainbow')
+        colors = cmap(np.linspace(0, 1, len(objs)))
+    plt.clf()
+    with torch.no_grad():
+        boxes = boxes.cpu().clone()
+        boxes *= size
+
+        plt.imshow(img)
+
+        plt.gca().set_xlim(0, size)
+        plt.gca().set_ylim(size, 0)
+        plt.gca().set_aspect(1.0, adjustable='box')
+
+        for i, obj in enumerate(objs):
+            if obj == '__image__':
+                continue
+            draw_box(boxes[i], colors[i], obj, alpha=0.8)
+    plt.axis('off')
+    plt.savefig(image_path, bbox_inches='tight', pad_inches=0)
+
+
+def draw_box(box, color, text=None, alpha=1.0):
     """
     Draw a bounding box using pyplot, optionally with a text box label.
 
@@ -98,7 +121,7 @@ def draw_box(box, color, text=None):
     assert y1 > y0, box
     assert x1 > x0, box
     w, h = x1 - x0, y1 - y0
-    rect = Rectangle((x0, y0), w, h, fc='none', lw=2, ec=color)
+    rect = Rectangle((x0, y0), w, h, fc='none', lw=2, ec=color, alpha=alpha)
     plt.gca().add_patch(rect)
     if text is not None:
         text_rect = Rectangle((x0, y0), w, TEXT_BOX_HEIGHT, fc=color, alpha=0.5)

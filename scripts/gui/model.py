@@ -8,9 +8,9 @@ import numpy as np
 import torch
 from imageio import imwrite
 
+import scene_generation.vis as vis
 from scene_generation.data.utils import imagenet_deprocess_batch
 from scene_generation.model import Model
-import scene_generation.vis as vis
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--checkpoint', required=True)
@@ -54,6 +54,7 @@ def get_model():
     model.features = features
     model.features_one = features_one
     model.colors = torch.randint(0, 256, [172, 3]).float()
+    model.colors[0, :] = 256
     model.eval()
     model.to(device)
     return model
@@ -64,32 +65,40 @@ def json_to_img(scene_graph, model):
     scene_graphs = json_to_scene_graph(scene_graph)
     current_time = datetime.now().strftime('%b%d_%H-%M-%S')
 
-    # print(scene_graphs, current_time)
     # Run the model forward
     with torch.no_grad():
-        imgs, boxes_pred, masks_pred, layout, layout_pred, _ = model.forward_json(scene_graphs)
+        (imgs, boxes_pred, masks_pred, layout, layout_pred, _), objs = model.forward_json(scene_graphs)
     imgs = imagenet_deprocess_batch(imgs)
 
-    # Save the generated images
+    # Save the generated image
     for i in range(imgs.shape[0]):
         img_np = imgs[i].numpy().transpose(1, 2, 0).astype('uint8')
         img_path = os.path.join('scripts', 'gui', 'images', output_dir, 'img{}.png'.format(current_time))
         imwrite(img_path, img_np)
         return_img_path = os.path.join('images', output_dir, 'img{}.png'.format(current_time))
 
-    # Save the generated images
+    # Save the generated layout image
     for i in range(imgs.shape[0]):
-        img_layout_np = one_hot_to_rgb(layout_pred[:, :172, :, :], model.colors)[0].numpy().transpose(1, 2, 0).astype('uint8')
+        img_layout_np = one_hot_to_rgb(layout_pred[:, :172, :, :], model.colors)[0].numpy().transpose(1, 2, 0).astype(
+            'uint8')
+        obj_colors = []
+        for obj in objs[:-1]:
+            new_color = torch.cat([model.colors[obj] / 256, torch.ones(1)])
+            obj_colors.append(new_color)
+
         img_layout_path = os.path.join('scripts', 'gui', 'images', output_dir, 'img_layout{}.png'.format(current_time))
-        imwrite(img_layout_path, img_layout_np)
+        vis.add_boxes_to_layout(img_layout_np, scene_graphs[i]['objects'], boxes_pred, img_layout_path,
+                                colors=obj_colors)
         return_img_layout_path = os.path.join('images', output_dir, 'img_layout{}.png'.format(current_time))
 
-    # Draw the scene graphs
+    # Draw and save the scene graph
     if args.draw_scene_graphs:
         for i, sg in enumerate(scene_graphs):
             sg_img = vis.draw_scene_graph(sg['objects'], sg['relationships'])
             sg_img_path = os.path.join('scripts', 'gui', 'images', output_dir, 'sg{}.png'.format(current_time))
             imwrite(sg_img_path, sg_img)
+            sg_img_path = os.path.join('images', output_dir, 'sg{}.png'.format(current_time))
+
     return return_img_path, return_img_layout_path
 
 
@@ -118,8 +127,15 @@ def json_to_scene_graph(json_text):
         sy0 = obj_s['top']
         sx1 = obj_s['width'] + sx0
         sy1 = obj_s['height'] + sy0
+
+        margin = (obj_s['size'] + 1) / 10 / 2
         mean_x_s = 0.5 * (sx0 + sx1)
         mean_y_s = 0.5 * (sy0 + sy1)
+
+        sx0 = max(0, mean_x_s - margin)
+        sx1 = min(1, mean_x_s + margin)
+        sy0 = max(0, mean_y_s - margin)
+        sy1 = min(1, mean_y_s + margin)
 
         size.append(obj_s['size'])
         location.append(obj_s['location'])
@@ -139,6 +155,12 @@ def json_to_scene_graph(json_text):
         d_x = mean_x_s - mean_x_o
         d_y = mean_y_s - mean_y_o
         theta = math.atan2(d_y, d_x)
+
+        margin = (obj_o['size'] + 1) / 10 / 2
+        ox0 = max(0, mean_x_o - margin)
+        ox1 = min(1, mean_x_o + margin)
+        oy0 = max(0, mean_y_o - margin)
+        oy1 = min(1, mean_y_o + margin)
 
         if sx0 < ox0 and sx1 > ox1 and sy0 < oy0 and sy1 > oy1:
             p = 'surrounding'

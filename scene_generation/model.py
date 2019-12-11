@@ -253,4 +253,4 @@ class Model(nn.Module):
         """ Convenience method that combines encode_scene_graphs and forward. """
         objs, triples, obj_to_img, attributes, features = self.encode_scene_graphs(scene_graphs)
         return self.forward(None, objs, triples, obj_to_img, attributes=attributes, test_mode=True,
-                            use_gt_box=False, features=features)
+                            use_gt_box=False, features=features), objs

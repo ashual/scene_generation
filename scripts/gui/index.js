@@ -58,51 +58,14 @@ window.onload = function () {
                 elementRect: {top: 0, left: 0, bottom: 1, right: 1}
             },
         })
-        // .resizable({
-        //     // resize from all edges and corners
-        //     edges: {left: true, right: true, bottom: true, top: true},
-        //
-        //     // keep the edges inside the parent
-        //     restrictEdges: {
-        //         outer: 'parent',
-        //         endOnly: true,
-        //     },
-        //
-        //     // minimum size
-        //     restrictSize: {
-        //         min: {width: 50, height: 50},
-        //     },
-        //
-        //     inertia: true,
-        // })
-        // .on('resizemove', function (event) {
-        //     var target = event.target,
-        //         x = (parseFloat(target.getAttribute('data-x')) || 0),
-        //         y = (parseFloat(target.getAttribute('data-y')) || 0);
-        //
-        //     // update the element's style
-        //     target.style.width = event.rect.width + 'px';
-        //     target.style.height = event.rect.height + 'px';
-        //
-        //     // translate when resizing from top or left edges
-        //     x += event.deltaRect.left;
-        //     y += event.deltaRect.top;
-        //
-        //     target.style.webkitTransform = target.style.transform =
-        //         'translate(' + x + 'px,' + y + 'px)';
-        //
-        //     target.setAttribute('data-x', x);
-        //     target.setAttribute('data-y', y);
-        //     // target.textContent = Math.round(event.rect.width) + '\u00D7' + Math.round(event.rect.height);
-        //     selectItem(event.target);
-        // })
+
         .on('tap', function (event) {
             console.log('tap');
             var target = event.target;
             var size = parseInt(target.getAttribute('data-size'));
             var new_size = (size + 1) % 10;
             target.setAttribute('data-size', new_size);
-            target.style.fontSize = new_size * 10 + 10;
+            target.style.fontSize = sizeToFont(new_size);
             // $(event.currentTarget).remove();
             selectItem(event, event.target);
             render_button();
@@ -120,23 +83,15 @@ window.onload = function () {
         var hasClass = $(target).hasClass('selected');
         $(".resize-drag").removeClass("selected");
         $('#range-slider').attr('data-id', '');
-        if (should_deselect && hasClass){
-            // var image_style = $('#range-slider').attr('image-id');
-            // image_style = image_style ? image_style : -1;
-            // $('#range-slider').data(image_style);
-            // $('.range-slider__value').text(image_style.toString());
+        if (should_deselect && hasClass) {
         } else {
             $(target).addClass("selected");
-            // event.currentTarget.classList.toggle('switch-bg');
             $('#range-slider').attr('data-id', target.id);
             var style = target.getAttribute('data-style');
             style = style ? style : -1;
             $('#range-slider').val(style);
             $('.range-slider__value').text(style.toString());
         }
-
-        // render_button();
-        // event.preventDefault();
     }
 
     $(".resize-drag").click(function (e) {
@@ -153,28 +108,21 @@ window.onload = function () {
     }
 
     function stuff_add(evt) {
-        // var selected_stuff = document.getElementById("stuff");
         evt.stopPropagation();
         var newContent = document.createTextNode(evt.currentTarget.textContent);
         var node = document.createElement("DIV");
         node.className = "resize-drag";
         node.id = guidGenerator();
         node.appendChild(newContent);
-        node.setAttribute('data-size', 0);
-        // node.style.fontSize = new_size * 10 + 10;
+        var init_size = 0;
+        node.setAttribute('data-size', init_size);
+        node.style.fontSize = sizeToFont(init_size);
         document.getElementById("resize-container").appendChild(node);
+        render_button();
     }
 
-    function thing_add() {
-        var selected_stuff = document.getElementById("thing");
-        var newContent = document.createTextNode(selected_stuff[selected_stuff.selectedIndex].value);
-        var node = document.createElement("DIV");
-        node.className = "resize-drag";
-        node.id = guidGenerator();
-        node.appendChild(newContent);
-        document.getElementById("resize-container").appendChild(node);
-        node.setAttribute('data-size', 2);
-
+    function sizeToFont(size) {
+        return size * 8 + 20;
     }
 
     function refresh_image(response) {
@@ -184,17 +132,18 @@ window.onload = function () {
     }
 
     function addRow(obj, size, location, feature) {
-      // Get a reference to the table
-      let tableRef = document.getElementById('table').getElementsByTagName('tbody')[0];
+        return;
+        // Get a reference to the table
+        let tableRef = document.getElementById('table').getElementsByTagName('tbody')[0];
 
-      // Insert a row at the end of the table
-      let newRow = tableRef.insertRow(-1);
+        // Insert a row at the end of the table
+        let newRow = tableRef.insertRow(-1);
 
-      // Insert a cell in the row at index 0
-      newRow.insertCell(0).appendChild(document.createTextNode(obj));
-      newRow.insertCell(1).appendChild(document.createTextNode(size + ''));
-      newRow.insertCell(2).appendChild(document.createTextNode(location + ''));
-      newRow.insertCell(3).appendChild(document.createTextNode(feature + ''));
+        // Insert a cell in the row at index 0
+        newRow.insertCell(0).appendChild(document.createTextNode(obj));
+        newRow.insertCell(1).appendChild(document.createTextNode(size + ''));
+        newRow.insertCell(2).appendChild(document.createTextNode(location + ''));
+        newRow.insertCell(3).appendChild(document.createTextNode(feature + ''));
     }
 
     function render_button() {
@@ -254,16 +203,15 @@ window.onload = function () {
             if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
                 refresh_image(xmlHttp.responseText);
         };
-        xmlHttp.open("GET", url, false); // true for asynchronous
+        xmlHttp.open("GET", url, true); // true for asynchronous
         xmlHttp.send(null);
     }
 
-    // document.getElementById("stuff-add").addEventListener("click", stuff_add);
-    // document.getElementById("thing-add").addEventListener("click", thing_add);
-    // document.getElementById("render-button").addEventListener("click", render_button);
-    document.querySelectorAll("ul.drop-menu > li").forEach(function(e){e.addEventListener("click", stuff_add)})
-    $(window).click(function(devt) {
-        if (!devt.target.getAttribute('data-size') && !devt.target.getAttribute('max')){
+    document.querySelectorAll("ul.drop-menu > li").forEach(function (e) {
+        e.addEventListener("click", stuff_add)
+    });
+    $(window).click(function (devt) {
+        if (!devt.target.getAttribute('data-size') && !devt.target.getAttribute('max')) {
             $(".resize-drag").removeClass("selected");
             var image_style = $('#range-slider').attr('image-id');
             image_style = image_style ? parseInt(image_style) : -1;
@@ -272,5 +220,5 @@ window.onload = function () {
             $('#range-slider').attr('data-id', '');
         }
     });
-}
+};
 
