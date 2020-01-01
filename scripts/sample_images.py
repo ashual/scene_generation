@@ -14,7 +14,6 @@ from scene_generation.data.utils import split_graph_batch
 from scene_generation.metrics import jaccard
 from scene_generation.model import Model
 from scene_generation.utils import int_tuple, bool_flag
-from scene_generation.vis import draw_scene_graph
 from scene_generation.bilinear import crop_bbox_batch
 from scripts.train_accuracy_net import all_pretrained_models
 
@@ -64,19 +63,21 @@ parser.add_argument('--stuff_json',
 def build_coco_dset(args, checkpoint):
     checkpoint_args = checkpoint['args']
     print('include other: ', checkpoint_args.get('coco_include_other'))
+    # When using GT masks, using the
+    mask_size = args.image_size[0] if args.use_gt_masks else checkpoint_args['mask_size']
     dset_kwargs = {
         'image_dir': args.coco_image_dir,
         'instances_json': args.instances_json,
         'stuff_json': args.stuff_json,
         'image_size': args.image_size,
-        'mask_size': checkpoint_args['mask_size'],
+        'mask_size': mask_size,
         'max_samples': args.num_samples,
         'min_object_size': checkpoint_args['min_object_size'],
         'min_objects_per_image': checkpoint_args['min_objects_per_image'],
         'instance_whitelist': checkpoint_args['instance_whitelist'],
         'stuff_whitelist': checkpoint_args['stuff_whitelist'],
         'include_other': checkpoint_args.get('coco_include_other', True),
-        'val_part': False,
+        'test_part': True,
         'sample_attributes': args.sample_attributes,
         'grid_size': args.grid_size
     }
@@ -87,6 +88,8 @@ def build_coco_dset(args, checkpoint):
 def build_coco_panoptic_dset(args, checkpoint):
     checkpoint_args = checkpoint['args']
     print('include other: ', checkpoint_args.get('coco_include_other'))
+    # When using GT masks, using the
+    mask_size = args.image_size[0] if args.use_gt_masks else checkpoint_args['mask_size']
     dset_kwargs = {
         'image_dir': args.coco_image_dir,
         'instances_json': args.instances_json,
@@ -94,14 +97,14 @@ def build_coco_panoptic_dset(args, checkpoint):
         'panoptic_segmentation': checkpoint_args['coco_panoptic_segmentation_val'],
         'stuff_json': args.stuff_json,
         'image_size': args.image_size,
-        'mask_size': checkpoint_args['mask_size'],
+        'mask_size': mask_size,
         'max_samples': args.num_samples,
         'min_object_size': checkpoint_args['min_object_size'],
         'min_objects_per_image': checkpoint_args['min_objects_per_image'],
         'instance_whitelist': checkpoint_args['instance_whitelist'],
         'stuff_whitelist': checkpoint_args['stuff_whitelist'],
         'include_other': checkpoint_args.get('coco_include_other', True),
-        'val_part': False,
+        'test_part': True,
         'sample_attributes': args.sample_attributes,
         'grid_size': args.grid_size
     }
@@ -158,6 +161,8 @@ def one_hot_to_rgb(layout_pred, colors, num_objs):
 
 
 def run_model(args, checkpoint, output_dir, loader=None):
+    if args.save_graphs:
+        from scene_generation.vis import draw_scene_graph
     dirname = os.path.dirname(args.checkpoint)
     features = None
     if not args.use_gt_textures:
@@ -173,7 +178,7 @@ def run_model(args, checkpoint, output_dir, loader=None):
         if loader is None:
             loader = build_loader(args, checkpoint, vocab['is_panoptic'])
         accuracy_model = None
-        if os.path.isfile(args.accuracy_model_path):
+        if args.accuracy_model_path is not None and os.path.isfile(args.accuracy_model_path):
             accuracy_model = load_model(args.accuracy_model_path)
 
         img_dir = makedir(output_dir, 'images')
@@ -283,7 +288,7 @@ def run_model(args, checkpoint, output_dir, loader=None):
 
             print('Saved %d images' % img_idx)
         avg_iou = total_iou / total_boxes
-        print(avg_iou)
+        print('avg_iou {}'.format(avg_iou.item()))
         print('r0.5 {}'.format(r_05 / total_boxes))
         print('r0.3 {}'.format(r_03 / total_boxes))
         if accuracy_model is not None:
